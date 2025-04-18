@@ -175,23 +175,43 @@ fun MenuItem(icon: ImageVector, title: String, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropdownMenuSample(selectedValue: String, onValueChange: (String) -> Unit) {
+fun LanguageDropdownMenu(
+    selectedLanguage: String,
+    onLanguageSelected: (String) -> Unit
+) {
+    val languages = listOf("English", "Spanish", "French", "German", "Mandarin", "Japanese", "Arabic")
     var expanded by remember { mutableStateOf(false) }
-    val options = listOf("English", "French", "Spanish")
 
-    Box {
-        Text(selectedValue, modifier = Modifier
-            .clickable { expanded = true }
-            .padding(8.dp))
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selectedLanguage,
+            onValueChange = {},
+            readOnly = true,
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+        )
 
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { option ->
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.exposedDropdownSize()
+        ) {
+            languages.forEach { language ->
                 DropdownMenuItem(
-                    text = { Text(option) },
+                    text = { Text(text = language) },
                     onClick = {
-                        onValueChange(option)
+                        onLanguageSelected(language)
                         expanded = false
-                    }
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                 )
             }
         }
@@ -211,7 +231,11 @@ fun ProfileScreen(navController: NavHostController) {
         try {
             val document = db.collection("students").document("current_user").get().await()
             student = document.toObject(Student::class.java)
-            student?.let { language = it.preferredLanguage }
+            student?.let {
+                if (it.preferredLanguage.isNotBlank()) {
+                    language = it.preferredLanguage
+                }
+            }
             isLoading = false
         } catch (e: Exception) {
             Log.e("ProfileScreen", "Error fetching student data", e)
@@ -266,7 +290,7 @@ fun ProfileScreen(navController: NavHostController) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Preferred Language:", fontSize = 18.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    DropdownMenuSample(language) { selected ->
+                    LanguageDropdownMenu(language) { selected ->
                         language = selected
                         // Update language preference in Firestore
                         db.collection("students").document("current_user")
