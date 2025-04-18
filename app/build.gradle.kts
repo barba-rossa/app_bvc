@@ -65,9 +65,22 @@ dependencies {
     implementation(libs.firebase.analytics)
     //firebase firestore
     implementation("com.google.firebase:firebase-firestore-ktx:24.10.4")
-    //deepseek
+    //playstore
     implementation(platform("com.google.firebase:firebase-bom:32.8.0"))
     implementation("com.google.android.gms:play-services-auth:21.0.0")
-
+    //tests
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.mockito:mockito-core:5.3.1")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:4.1.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
+    testImplementation("com.google.truth:truth:1.1.3")
+    //Compose tests
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.6.1")
+    // Lifecycle components (using version catalog)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 
 }
