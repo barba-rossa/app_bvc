@@ -30,6 +30,10 @@ import com.example.app_bvc.ui.theme.App_BVCTheme
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
+//groups
+import androidx.compose.runtime.rememberCoroutineScope
+import com.google.firebase.firestore.FieldValue
+import kotlinx.coroutines.launch
 
 // Data classes for Firestore documents
 data class Student(
@@ -561,24 +565,86 @@ fun ProgressScreen(navController: NavHostController) {
     }
 }
 
+// Define this data class outside the Composable function
+data class GroupWithId(
+    val docId: String,
+    val name: String,
+    val members: Int
+)
+
 @Composable
 fun GroupsScreen(navController: NavHostController) {
     val db = Firebase.firestore
-    var groups by remember { mutableStateOf<List<Group>>(emptyList()) }
+    var groups by remember { mutableStateOf<List<GroupWithId>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    val joined = remember { mutableStateMapOf<String, Boolean>() }
+    val joinedGroups = remember { mutableStateMapOf<String, Boolean>() }
+    var updateTrigger by remember { mutableStateOf(0) }
+    val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(key1 = true) {
-        try {
-            val querySnapshot = db.collection("groups").get().await()
-            groups = querySnapshot.documents.mapNotNull {
-                it.toObject(Group::class.java)
+    // Function to refresh groups data
+    val refreshGroups = {
+        coroutineScope.launch {
+            try {
+                val querySnapshot = db.collection("groups").get().await()
+                groups = querySnapshot.documents.mapNotNull { doc ->
+                    val group = doc.toObject(Group::class.java)
+                    if (group != null) {
+                        GroupWithId(
+                            docId = doc.id,
+                            name = group.name,
+                            members = group.members
+                        )
+                    } else null
+                }
+                isLoading = false
+            } catch (e: Exception) {
+                Log.e("GroupsScreen", "Error fetching groups", e)
+                isLoading = false
             }
-            isLoading = false
-        } catch (e: Exception) {
-            Log.e("GroupsScreen", "Error fetching groups", e)
-            isLoading = false
         }
+    }
+
+    // Initial data load
+    LaunchedEffect(key1 = updateTrigger) {
+        refreshGroups()
+    }
+
+    // Function to join a group
+    val joinGroup = { group: GroupWithId ->
+        joinedGroups[group.docId] = true
+
+        // Update members count in Firestore
+        db.collection("groups").document(group.docId)
+            .update("members", FieldValue.increment(1))
+            .addOnSuccessListener {
+                Log.d("GroupsScreen", "Successfully joined group: ${group.name}")
+                // Force refresh to update the member count
+                updateTrigger += 1
+            }
+            .addOnFailureListener { e ->
+                Log.e("GroupsScreen", "Error joining group", e)
+                // Revert UI state on failure
+                joinedGroups[group.docId] = false
+            }
+    }
+
+    // Function to leave a group
+    val leaveGroup = { group: GroupWithId ->
+        joinedGroups[group.docId] = false
+
+        // Update members count in Firestore
+        db.collection("groups").document(group.docId)
+            .update("members", FieldValue.increment(-1))
+            .addOnSuccessListener {
+                Log.d("GroupsScreen", "Successfully left group: ${group.name}")
+                // Force refresh to update the member count
+                updateTrigger += 1
+            }
+            .addOnFailureListener { e ->
+                Log.e("GroupsScreen", "Error leaving group", e)
+                // Revert UI state on failure
+                joinedGroups[group.docId] = true
+            }
     }
 
     Column(modifier = Modifier.padding(16.dp)) {
@@ -615,9 +681,15 @@ fun GroupsScreen(navController: NavHostController) {
                                 Text(group.name, fontSize = 18.sp)
                                 Text("${group.members} members", fontSize = 14.sp, color = Color.Gray)
                             }
-                            val isMember = joined[group.name] == true
+                            val isMember = joinedGroups[group.docId] == true
                             Button(
-                                onClick = { joined[group.name] = !isMember },
+                                onClick = {
+                                    if (isMember) {
+                                        leaveGroup(group)
+                                    } else {
+                                        joinGroup(group)
+                                    }
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isMember) Color.Red else Color(0xFF002F6C)
                                 )
